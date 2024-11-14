@@ -1,0 +1,13 @@
+// Test Messages:
+
+// Speed control
+General Template: {"channels":[1,<speed>,0]}
+Full Reverse	: {"channels":[1,-100,0]}
+Stop		: {"channels":[1,0,0]}
+Full Forward	: {"channels":[1,100,0]}
+
+// Settings options
+Get the current settings	: {"outputSettings":{}}
+Save the current settings	: {"outputSettings":{"save":true}}
+Reset the settings:		: {"outputSettings":{"default":true}}
+Set something			: {"outputSettings":{"propulsionSystem":{"motors":[{"channel":1,"polarity":true,"minPower":20,"maxPower":80,"responseTime":1000},{"channel":2,"polarity":true,"minPower":20,"maxPower":80,"responseTime":1000},{"channel":3,"polarity":true,"minPower":20,"maxPower":80,"responseTime":1000},{"channel":3,"polarity":true,"minPower":20,"maxPower":80,"responseTime":1000}],"armChannel":0},"sensors":{"voltageFactor":0.00321676,"currentFactor":0.00805861,"updateInterval":10000},"battery":{"maxVoltage":12.30,"minVoltage":10.50},"accessories":{"ledChannel":4,"maxLedPower":74}}}
