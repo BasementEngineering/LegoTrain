@@ -28,31 +28,36 @@ class SpeedMonitor{
   }
 
   void update(){
-    //Serial.println("Updating speed monitor");
+    Serial.println("Updating speed monitor");
     if((millis() - this->lastUpdate) > 1000){
-      //Serial.println("About to draw");
+      Serial.println("About to draw");
       draw();
-      //Serial.println("Drew");
+      Serial.println("Drew");
       this->lastUpdate = millis();
     }
   }
 
   void draw(){
+    Serial.println("Clearing display");
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
     display.setCursor(0, 0);
+    Serial.println("Starting to print");
     display.print("Speed: ");
     display.setTextSize(2);
+    Serial.println("Printing speed");
     display.print(String(this->speed));
     display.setTextSize(1);
     display.println(" m/s");
     display.setCursor(0, 16);
+    Serial.println("Printing distance");
     display.print("Distance: ");
     display.setTextSize(2);
-    display.print(String(this->distance/1000));
+    display.print(String(this->distance));
     display.setTextSize(1);
     display.println(" m");
+    Serial.println("Attempting to display");
     display.display();
   }
 
@@ -61,6 +66,7 @@ class SpeedMonitor{
     display.display();
     delay(500);
     display.clearDisplay();
+    display.setRotation(2);
     draw();
   }
 

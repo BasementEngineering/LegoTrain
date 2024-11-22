@@ -1,70 +1,51 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Train Control</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-      #chart-container {
-        width: 100%;
-        height: 50vh;
-      }
-      #controls-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        margin-top: 20px;
-      }
-      .control-group {
-        margin: 10px 0;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="chart-container">
-      <canvas id="chart"></canvas>
-    </div>
-    <div id="controls-container">
-      <div class="control-group">
-        <label for="speed">Speed:</label>
-        <input type="range" id="speed" name="speed" min="0" max="100">
-        <span id="setpoint">Setpoint: 0</span>
-        <span id="actualSpeed">Actual Speed: 0</span>
-      </div>
-      <div class="control-group">
-        <span id="batteryVoltage">Battery Voltage: 0V</span>
-      </div>
-      <div class="control-group">
-        <button id="emergencyStop">Emergency Stop</button>
-      </div>
-      <div class="control-group">
-        <button id="specialFunction1">Special Function 1</button>
-        <button id="specialFunction2">Special Function 2</button>
-      </div>
-    </div>
-    <script type="module" src="/main.js"></script>
-  </body>
-</html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remote Train Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="top-half">
+            <div class="buttons">
+                <button class="mode-button" id="btn_mode1">Manual</button>
+                <button class="mode-button" id="btn_mode2">Target Output</button>
+                <button class="mode-button" id="btn_mode3">Target Speed</button>
+                <button class="mode-button" id="btn_mode4">Full Auto</button>
+            </div>
+            <div class="bars">
+                <div class="bar">
+                    <div class="setpoint-value" id="bar_setpoint"></div>
+                </div>
+                <div class="bar">
+                    <div class="input-value" id="bar_input"></div>
+                </div>
+                <div class="bar">
+                    <div class="output-value" id="bar_output"></div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom-left-quarter">
+            <div class="joystick-container">
+                <div class="joystick" id="joystick"></div>
+            </div>
+        </div>
+        <div class="bottom-right-quarter">
+            <!--
+          <label for="max_speed">Max Speed</label>
+            <input type="range" class="output-range" id="range_max_speed" min="0" max="500" value="300">
+            <p id="max_speed_value">0</p>
+            <label for="max_output">Max Output</label>
+            <input type="range" class="output-range" id="range_max_output" min="0" max="100" value="80">
+            <p id="max_output_value">0</p>-->
+            <button class="bottom-right-button" id="btn_direction_forwards">Forwards</button>
+            <button class="bottom-right-button" id="btn_direction_backwards">Backwards</button>
+            <button class="bottom-right-button" style="background-color: red;" id="stop_btn">Staap</button>
 
-<!---
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite App</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/main.js"></script>
-  </body>
+        </div>
+    </div>
+    <script type="module" src="main.js"></script>
+</body>
 </html>
--->

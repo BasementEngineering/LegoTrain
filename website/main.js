@@ -1,116 +1,128 @@
 import './style.css'
-import javascriptLogo from './javascript.svg'
-import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.js'
-const socket = new WebSocket('ws://your-websocket-url');
+import { initModeSelctor,getChoosenMode,setChoosenMode,setUpdateCallback } from './modeSelector';
+import { initTrainControls, getSetpointValue } from './trainControls';
 
-const NO_BACKEND = true;
-var chart = null;
-
-function setupDataGenerator() {
-  setInterval(() => {
-    updateValues();
-  }, 100)
+var controlData ={
+  setpoint: 0,
+  input: 0,
+  output: 0
 }
 
-function setupChart() {
-  const ctx = document.getElementById('chart').getContext('2d');
-  chart = new Chart(ctx, config);
-}
+const maxSpeed = 500;
 
-var currentSpeed = 0;
-var currentOutput = 0;
-var currentSetpoint = 0;
-var timeStamp = 0;
+const NO_BACKEND = false;
 
-const config = {
-  type: 'line',
-  data: {
-    labels: [],
-    datasets: [
-      {
-        label: 'Setpoint',
-        data: [],
-        borderColor: 'red',
-        fill: false
-      },
-      {
-        label: 'Input',
-        data: [],
-        borderColor: 'blue',
-        fill: false
-      },
-      {
-        label: 'Output',
-        data: [],
-        borderColor: 'green',
-        fill: false
-      }
-    ]
-  },
-  options: {
-    responsive: true,
-    scales: {
-      x: {
-        display: true,
-        title: {
-          display: true,
-          text: 'Time'
-        }
-      },
-      y: {
-        display: true,
-        title: {
-          display: true,
-          text: 'Value'
-        }
-      }
+let websocket;
+const host = window.location.hostname;
+//const host = "192.168.178.94";
+
+function parseWsMessage(event) {
+    const message = JSON.parse(event.data);
+    console.log('WebSocket message:', message);
+
+    if (message.hasOwnProperty('controlData')) {
+      controlData = message.controlData;
+      updateBars(controlData);
     }
-  }
-};
-
-function addData(chart, label, data) {
-  if (chart.data.labels.length >= 50) {
-    chart.data.labels.shift();
-    chart.data.datasets.forEach((dataset) => {
-      dataset.data.shift();
-    });
-  }
-  chart.data.labels.push(label);
-  chart.data.datasets.forEach((dataset) => {
-    dataset.data.push(data[chart.data.datasets.indexOf(dataset)]);
-  });
-  chart.update();
 }
 
-function updateValues() {
-  currentSpeed = Math.floor(Math.random() * 100);
-  currentOutput = Math.floor(Math.random() * 100);
-  currentSetpoint = Math.floor(Math.random() * 100);
-  timeStamp += 0.1;
-  timeStamp = parseFloat(timeStamp.toFixed(1));
-  addData(chart, timeStamp, [currentSetpoint, currentSpeed, currentOutput]);
+function initWebSocket() {
+    websocket = new WebSocket('ws://' + host + ':81/');
+    websocket.onopen = () => console.log('WebSocket connection opened');
+    websocket.onclose = () => {
+        console.log('WebSocket connection closed, attempting to reconnect');
+        setTimeout(initWebSocket, 1000);
+    };
+    websocket.onerror = (error) => console.error('WebSocket error:', error);
+    websocket.onmessage = parseWsMessage;
 }
 
-function main() {
-  setupChart();
+function onSelectionChanged(mode) {
+    console.log('onSelectionChanged', mode);
+    fetch(`http://${host}/mode`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ mode })
+    })
+    .then(response => response.json())
+    .then(data => console.log('Mode updated:', data))
+    .catch(error => console.error('Error updating mode:', error));
+}
 
-  if (NO_BACKEND) {
-    setupDataGenerator();
+function sendJoystickValue(value) {
+    console.log(JSON.stringify({ setpoint: value }));
+    if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.send(JSON.stringify({ setpoint: value }));
+    }
+}
+
+function genrateData(){
+  controlData.setpoint = getSetpointValue();
+
+  controlData.input = controlData.setpoint + ( 5 - Math.floor(Math.random() * 10));
+
+  if(controlData.setpoint > controlData.input){
+    controlData.output = controlData.output + 1;
   }
-  else {
-  socket.addEventListener('message', function (event) {
-    const data = event.data.split(',');
-    currentSpeed = parseFloat(data[0]);
-    currentOutput = parseFloat(data[1]);
-    currentSetpoint = parseFloat(data[2]);
-    timeStamp += 0.1;
-    timeStamp = parseFloat(timeStamp.toFixed(1));
-    addData(chart, timeStamp, [currentSetpoint, currentSpeed, currentOutput]);
-  });
+  else if(controlData.setpoint < controlData.input){
+    controlData.output = controlData.output - 1;
   }
-  
-  
+  if(controlData.output > 100){
+    controlData.output = 100;
   }
+
+}
+
+function updateBars(controlData){
+
+  var setpointPercentage = controlData.setpoint;
+  var inputPercentage = controlData.input;
+  if(getChoosenMode() == 2 || getChoosenMode() == 3){
+    setpointPercentage = (controlData.setpoint * 100) / maxSpeed;
+    inputPercentage = (controlData.input * 100) / maxSpeed;
+  }
+
+  document.getElementById('bar_setpoint').style.height = `${50 + 0.5*setpointPercentage}%`;
+  document.getElementById('bar_setpoint').innerHTML = controlData.setpoint;
+
+  document.getElementById('bar_input').style.height = `${50+ 0.5*inputPercentage}%`;
+  document.getElementById('bar_input').innerHTML = controlData.input;
+
+  document.getElementById('bar_output').style.height = `${50+ 0.5*controlData.output}%`;
+  document.getElementById('bar_output').innteHTML = controlData.output;
+}
+
+function initFromBackendData(){
+  fetch(`http://${host}/mode`)
+    .then(response => response.json())
+    .then(data => setChoosenMode(data.mode))
+    .catch(error => console.error('Error fetching mode:', error));
+}
+
+function main(){
+  initWebSocket();
+  initModeSelctor();
+  setUpdateCallback(onSelectionChanged);
+
+  initTrainControls();
+
+  setInterval(() => {
+    
+    if(NO_BACKEND){
+      genrateData();
+    }
+    else{
+      sendJoystickValue(getSetpointValue());
+    }
+    updateBars(controlData);
+
+}, 100);
+
+  if(!NO_BACKEND){
+    initFromBackendData();
+  }
+}
 
 main();

@@ -66,6 +66,7 @@ class SpeedMonitor{
     display.display();
     delay(500);
     display.clearDisplay();
+    display.setRotation(2);
     draw();
   }
 

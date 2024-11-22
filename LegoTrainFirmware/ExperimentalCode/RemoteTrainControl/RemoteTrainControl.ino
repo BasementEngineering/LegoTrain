@@ -1,28 +1,55 @@
 #include "TrainMotor.h"
 #include "Credentials.h"
 #include "Frontend.h"
+#include "ControlLoop.h"
 
 #include <WiFi.h>
 #include <WebServer.h>
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
 
-#define MOTOR_PIN 26
-#define ANALOG_SENSOR_PIN 32
-#define SPEED_POTI_PIN 34
+#include <Pinout.h>
 
 TrainMotor motor(MOTOR_PIN);
+ControlLoop controlLoop;
 
 unsigned long lastMotorSpeedUpdate = 0;
 int currentSpeed = 0;
 int setpoint = 0;
 int speed = 0;
 
+unsigned long lastInputSignal = 0;
+#define INPUT_TIMEOUT 1000
+
 WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
 void handleRoot() {
     server.send(200, "text/html", htmlPage);
+}
+
+void handleMode(){
+    if(server.method() == HTTP_POST){
+        StaticJsonDocument<200> doc;
+        DeserializationError error = deserializeJson(doc, server.arg("plain"));
+        if (error) {
+            Serial.print(F("deserializeJson() failed: "));
+            Serial.println(error.c_str());
+            return;
+        }
+        controlLoop.setMode(doc["mode"]);
+        server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
+    }else if(server.method() == HTTP_GET){
+        server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
+    }
+}
+
+void handleStop(){
+    lastInputSignal = millis();
+    controlLoop.reset();
+    speed = 0;
+    motor.setSpeed(0);
+    server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
 }
 
 void parsePayload(uint8_t * payload, size_t length) {
@@ -33,10 +60,13 @@ void parsePayload(uint8_t * payload, size_t length) {
         Serial.println(error.c_str());
         return;
     }
-    if (doc.containsKey("speed")) {
-        speed = doc["speed"];
+    if (doc.containsKey("setpoint")) {
+        speed = doc["setpoint"];
+        lastInputSignal = millis();
     }
 }
+
+uint8_t clientNum = 0;
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
     switch(type) {
@@ -45,8 +75,9 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
             break;
         case WStype_CONNECTED: {
             IPAddress ip = webSocket.remoteIP(num);
+            clientNum = num;
             Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
-            webSocket.sendTXT(num, "Connected");
+            //webSocket.sendTXT(num, "Connected");
         }
             break;
         case WStype_TEXT:
@@ -67,6 +98,8 @@ void setupWiFi() {
 
 void setupWebServer() {
     server.on("/", handleRoot);
+    server.on("/mode", handleMode);
+    server.on("/stop", handleStop);
     server.begin();
     Serial.println("HTTP server started");
 }
@@ -97,35 +130,22 @@ void loop() {
 }
 
 void updateMotor(){
-  if( (millis() - lastMotorSpeedUpdate) > 100){
-  if(speed < 10 && speed > -10){
+  if( (millis() - lastInputSignal) > INPUT_TIMEOUT){
+    Serial.println("Input Timeout");
     speed = 0;
     currentSpeed = 0;
+    motor.setSpeed(0);
+    return;
   }
-  setpoint = speed;
-  currentSpeed = speed;
 
-  /*if(currentSpeed < setpoint){
-    currentSpeed++;
-    if(currentSpeed > 100){
-      currentSpeed = 100;
-    }
-  }
-  else if(currentSpeed > setpoint){
-    currentSpeed--;
-    if(currentSpeed < -100){
-      currentSpeed = -100;
-    }
-  }*/
-  motor.setSpeed(currentSpeed);
+  if( (millis() - lastMotorSpeedUpdate) > 100){
+  controlLoop.setTarget(speed);
+  motor.setSpeed(controlLoop.calculateOutput());
+  //controlLoop.printStatus();
   
-  Serial.print("Setpoint:");
-  Serial.print(setpoint);
-  Serial.print(",");
-  Serial.print("Output:");
-  Serial.print(currentSpeed);
-  Serial.println("");
-
+  String statusJson = controlLoop.getStatusJson();
+  webSocket.sendTXT(clientNum , statusJson);
+  //webSocket.sendTXT(5, "Hello");
 
   lastMotorSpeedUpdate = millis();
   }

@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Remote Train Control</title>
     <style>
+        :root {
+            --primary-color: #cbcdd8a2;
+            --secondary-color: #ffae00;
+            --secondary-color-shade1: #ff9100;
+            --secondary-color-shade2: #ff6200;
+            --secondary-color-shade3: #ff5100;
+        }
+
         body {
             display: flex;
             justify-content: center;
@@ -12,6 +20,110 @@
             height: 100vh;
             margin: 0;
             font-family: Arial, sans-serif;
+            background-color: var(--primary-color);
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+        }
+        .top-half {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 50%;
+        }
+        .buttons {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 30%;
+        }
+        .mode-button {
+            width: 20%;
+            height: 80%;
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.2em;
+            cursor: pointer;
+        }
+        .bars {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 70%;
+        }
+        .bar {
+            width: 20%;
+            height: 80%;
+            background-color: #f0f0f0;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            position: relative;
+        }
+        .setpoint-value {
+            width: 100%;
+            height: 20%;
+            background-color: var(--secondary-color-shade1);
+            position: absolute;
+            bottom: 0;
+            border-radius: 10px 10px 0 0;
+        }
+        .input-value{
+            width: 100%;
+            height: 20%;
+            background-color: var(--secondary-color-shade2);
+            position: absolute;
+            bottom: 0;
+            border-radius: 10px 10px 0 0;
+        }
+        .output-value {
+            width: 100%;
+            height: 20%;
+            background-color: var(--secondary-color-shade3);
+            position: absolute;
+            bottom: 0;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .output-range {
+            width: 80%;
+            margin: 10px 0;
+            accent-color: var(--secondary-color);
+        }
+        .bottom-left-quarter {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 50%;
+            height: 50%;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+        }
+        .bottom-right-quarter {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            width: 50%;
+            height: 50%;
+            position: absolute;
+            bottom: 0;
+            right: 0;
+        }
+        .bottom-right-button{
+            width: 80%;
+            height: 20%;
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1.2em;
+            cursor: pointer;
         }
         .joystick-container {
             width: 100px;
@@ -24,7 +136,7 @@
         .joystick {
             width: 80px;
             height: 80px;
-            background-color: #007bff;
+            background-color: var(--secondary-color);
             border-radius: 50%;
             position: absolute;
             left: 50%;
@@ -34,8 +146,43 @@
     </style>
 </head>
 <body>
-    <div class="joystick-container">
-        <div class="joystick" id="joystick"></div>
+    <div class="container">
+        <div class="top-half">
+            <div class="buttons">
+                <button class="mode-button" id="btn_mode1">Manual</button>
+                <button class="mode-button" id="btn_mode2">Target Output</button>
+                <button class="mode-button" id="btn_mode3">Target Speed</button>
+                <button class="mode-button" id="btn_mode4">Full Auto</button>
+            </div>
+            <div class="bars">
+                <div class="bar">
+                    <div class="setpoint-value" id="left-bar"></div>
+                </div>
+                <div class="bar">
+                    <div class="input-value" id="right-bar"></div>
+                </div>
+                <div class="bar">
+                    <div class="output-value" id="right-bar"></div>
+                </div>
+            </div>
+        </div>
+        <div class="bottom-left-quarter">
+            <div class="joystick-container">
+                <div class="joystick" id="joystick"></div>
+            </div>
+        </div>
+        <div class="bottom-right-quarter">
+            <label for="max_speed">Max Speed</label>
+            <input type="range" class="output-range" id="range_max_speed" min="0" max="500" value="300">
+            <p id="max_speed_value">0</p>
+            <label for="max_output">Max Output</label>
+            <input type="range" class="output-range" id="range_max_output" min="0" max="100" value="80">
+            <p id="max_output_value">0</p>
+            <button class="bottom-right-button" id="btn_direction_forwards">Forwards</button>
+            <button class="bottom-right-button" id="btn_direction_backwards">Backwards</button>
+            <button class="bottom-right-button" style="background-color: red;" id="stop_btn">Staap</button>
+
+        </div>
     </div>
 
     <script>
@@ -60,6 +207,7 @@
                 websocket.send(JSON.stringify({ speed: value }));
             }
         }
+        
         function resetJoystickPosition() {
             joystick.style.top = `${container.offsetHeight / 2 - joystick.offsetHeight / 2}px`;
         }
@@ -106,6 +254,7 @@
                 document.removeEventListener('mousemove', onMouseMove);
             }, { once: true });
         });
+
 
         setInterval(() => {
             sendJoystickValue(getJoystickValue());
