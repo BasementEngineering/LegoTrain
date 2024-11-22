@@ -14,8 +14,8 @@ TrainMotor motor(MOTOR_PIN);
 ControlLoop controlLoop;
 
 unsigned long lastMotorSpeedUpdate = 0;
-int currentSpeed = 0;
-int setpoint = 0;
+//int currentSpeed = 0;
+//int setpoint = 0;
 int speed = 0;
 
 unsigned long lastInputSignal = 0;

@@ -11,4 +11,7 @@
 #define SOFT_TX 35
 #define SOFT_RX 34
 
+#define MAGNET_BOTTOM_PIN 19
+#define MAGNET_SIDE_PIN 18
+
 #endif

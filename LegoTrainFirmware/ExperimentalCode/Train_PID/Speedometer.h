@@ -79,6 +79,10 @@ class Speedometer {
       analogSensePin = analogPin;
     }
 
+    void setInverted(bool invert){
+      inverted = invert;
+    }
+
     int getInterval() {
       return SENSE_INTERVAL;
     }
@@ -119,6 +123,9 @@ class Speedometer {
     }
 
     int getSpeed() {
+      if(inverted){
+        return -currentSpeed;
+      }
       return currentSpeed;
     }
 

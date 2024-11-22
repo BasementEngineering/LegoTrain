@@ -1,6 +1,6 @@
 import './style.css'
 import { initModeSelctor,getChoosenMode,setChoosenMode,setUpdateCallback } from './modeSelector';
-import { initTrainControls, getSetpointValue } from './trainControls';
+import { initTrainControls, getSetpointValue,setStopCallback } from './trainControls';
 
 var controlData ={
   setpoint: 0,
@@ -49,6 +49,18 @@ function onSelectionChanged(mode) {
     .then(response => response.json())
     .then(data => console.log('Mode updated:', data))
     .catch(error => console.error('Error updating mode:', error));
+}
+
+function onStop(){
+  fetch(`http://${host}/stop`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => console.log('Stop:', data))
+  .catch(error => console.error('Error stopping:', error));
 }
 
 function sendJoystickValue(value) {
@@ -105,6 +117,7 @@ function main(){
   initWebSocket();
   initModeSelctor();
   setUpdateCallback(onSelectionChanged);
+  setStopCallback(onStop);
 
   initTrainControls();
 
@@ -114,7 +127,11 @@ function main(){
       genrateData();
     }
     else{
-      sendJoystickValue(getSetpointValue());
+      var newSetpoint = getSetpointValue();
+      if(getChoosenMode() == 2 || getChoosenMode() == 3){
+        newSetpoint = (getSetpointValue() * maxSpeed) / 100;
+      }
+      sendJoystickValue(newSetpoint);
     }
     updateBars(controlData);
 

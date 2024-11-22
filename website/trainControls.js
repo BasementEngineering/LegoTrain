@@ -102,4 +102,4 @@ function updateJoystickPosition(event) {
     joystick.style.top = `${top}px`;
 }
 
-export {initTrainControls, getSetpointValue};
+export {initTrainControls, getSetpointValue, setStopCallback};

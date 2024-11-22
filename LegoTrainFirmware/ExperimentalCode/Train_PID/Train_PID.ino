@@ -1,103 +1,201 @@
-#include "Speedometer.h"
-#include "SpeedMonitor.h"
 #include "TrainMotor.h"
+#include "Credentials.h"
+#include "Frontend.h"
+#include "ControlLoop.h"
+#include "SpeedMonitor.h"
+#include "Speedometer.h"
+#include "MagnetSensors.h"
+#include "Autopilot.h"
 
-#define MOTOR_PIN 26
-#define ANALOG_SENSOR_PIN 32
-#define SPEED_POTI_PIN 34
+#include <WiFi.h>
+#include <WebServer.h>
+#include <WebSocketsServer.h>
+#include <ArduinoJson.h>
 
+#include <Pinout.h>
+
+int newSetpoint = 0;
+
+TrainMotor motor(MOTOR_PIN);
+ControlLoop controlLoop;
 SpeedMonitor speedMonitor;
 Speedometer speedometer(ANALOG_SENSOR_PIN);
-TrainMotor motor(MOTOR_PIN);
+MagnetSensors magnetSensors(MAGNET_BOTTOM_PIN, MAGNET_SIDE_PIN);
 
 unsigned long lastMotorSpeedUpdate = 0;
 
-#include <PID_v1.h>
-double Setpoint, Input, Output;
-//Specify the links and initial tuning parameters
-double Kp=0.15, Ki=0.0, Kd=0.01;
-PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+unsigned long lastInputSignal = 0;
+#define INPUT_TIMEOUT 1000
 
-#define SPEED_TIMEOUT 10000
-unsigned long speedTimeoutStart = 0;
+WebServer server(80);
+WebSocketsServer webSocket = WebSocketsServer(81);
 
-void updateMotor(){
-  if( (millis() - lastMotorSpeedUpdate) > 100){
-    int speed = map(analogRead(SPEED_POTI_PIN), 0, 4095, -400, 400);
-  if(speed < 20 && speed > -20){
-    speed = 0;
-    Output = 0;
-  }
-  Setpoint = speed;
-  Input = speedometer.getSpeed();
-  //myPID.Compute();
-
-/*
-  int delta = Input - Setpoint;
-  if(delta == 0){
-    speedTimeoutStart = millis();
-  }
-
-  if((millis() - speedTimeoutStart) > SPEED_TIMEOUT){
-    Output = 0;
-  }*/
-
-  if(Input < Setpoint){
-    Output++;
-    if(Output > 100){
-      Output = 100;
-    }
-  }
-  else if(Input > Setpoint){
-    Output--;
-    if(Output < -100){
-      Output = -100;
-    }
-  }
-  motor.setSpeed(Output);
-  
-  Serial.print("Speed:");
-  Serial.print(Input);
-  Serial.print(",");
-  Serial.print("Setpoint:");
-  Serial.print(Setpoint);
-  Serial.print(",");
-  Serial.print("Output:");
-  Serial.print(Output);
-  Serial.println("");
-
-
-  lastMotorSpeedUpdate = millis();
-  }
-  
+void handleRoot()
+{
+    server.send(200, "text/html", htmlPage);
 }
 
-void setup() {
-  Serial.begin(9600);
-  myPID.SetMode(AUTOMATIC);
-  delay(500);
-  Serial.println("Starting setup");
-  delay(500);
-  Serial.println("Setting up speed monitor");
-  speedMonitor.begin();
-  
-  speedMonitor.setSpeed(40);
-  speedMonitor.update();
-  delay(500);
-  Serial.println("Setting up encoder");
-  speedometer.setupEncoder();
-  Serial.println("Setting up motor");
-  motor.begin();
-  Serial.println("Activating HW Timer");
-  setupTimerInterrupt();
-  Serial.println("Ready to go");
-  pinMode(SPEED_POTI_PIN, INPUT);
+void handleMode()
+{
+    if (server.method() == HTTP_POST)
+    {
+        StaticJsonDocument<200> doc;
+        DeserializationError error = deserializeJson(doc, server.arg("plain"));
+        if (error)
+        {
+            Serial.print(F("deserializeJson() failed: "));
+            Serial.println(error.c_str());
+            return;
+        }
+        controlLoop.setMode(doc["mode"]);
+        server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
+    }
+    else if (server.method() == HTTP_GET)
+    {
+        server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
+    }
 }
 
-void loop() {
-  delay(10);
-  speedMonitor.setSpeed(speedometer.getSpeed());
-  speedMonitor.setDistance(speedometer.getDistance());
-  speedMonitor.update();
-  updateMotor();
+void handleStop()
+{
+    controlLoop.reset();
+    newSetpoint = 0;
+    motor.setSpeed(0);
+    server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
+}
+
+Autopilot autopilot(&newSetpoint,&magnetSensors,handleStop);
+
+void parsePayload(uint8_t *payload, size_t length)
+{
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, payload);
+    if (error)
+    {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.c_str());
+        return;
+    }
+    if (doc.containsKey("setpoint"))
+    {
+        if(controlLoop.getMode() < 3){
+            newSetpoint = doc["setpoint"];
+            lastInputSignal = millis();
+        }
+    }
+}
+
+uint8_t clientNum = 0;
+
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t *payload, size_t length)
+{
+    switch (type)
+    {
+    case WStype_DISCONNECTED:
+        Serial.printf("[%u] Disconnected!\n", num);
+        break;
+    case WStype_CONNECTED:
+    {
+        IPAddress ip = webSocket.remoteIP(num);
+        clientNum = num;
+        Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
+        // webSocket.sendTXT(num, "Connected");
+    }
+    break;
+    case WStype_TEXT:
+        // Serial.printf("[%u] get Text: %s\n", num, payload);
+        parsePayload(payload, length);
+        break;
+    }
+}
+
+void setupWiFi()
+{
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED)
+    {
+        delay(1000);
+        Serial.println("Connecting to WiFi...");
+    }
+    Serial.println("Connected to WiFi");
+}
+
+void setupWebServer()
+{
+    server.on("/", handleRoot);
+    server.on("/mode", handleMode);
+    server.on("/stop", handleStop);
+    server.begin();
+    Serial.println("HTTP server started");
+}
+
+void setupWebSocket()
+{
+    webSocket.begin();
+    webSocket.onEvent(webSocketEvent);
+    Serial.println("WebSocket server started");
+}
+
+void setup()
+{
+    Serial.begin(9600);
+    Serial.println("Starting setup");
+    delay(500);
+    Serial.println("Setting up speed monitor");
+    speedMonitor.begin();
+    speedMonitor.setSpeed(40);
+    speedMonitor.update();
+    delay(500);
+    Serial.println("Setting up encoder");
+    speedometer.setupEncoder();
+    speedometer.setInverted(true);
+    Serial.println("Activating HW Timer");
+    setupTimerInterrupt();
+
+    setupWiFi();
+    setupWebServer();
+    setupWebSocket();
+
+    magnetSensors.setup();
+    motor.begin();
+    Serial.println("Ready to go");
+}
+
+void loop()
+{
+    delay(10);
+    updateMotor();
+    server.handleClient();
+    webSocket.loop();
+    speedMonitor.setSpeed(speedometer.getSpeed());
+    speedMonitor.setDistance(speedometer.getDistance());
+    speedMonitor.update();
+    magnetSensors.update();
+
+    if(magnetSensors.sideWasTriggered()){
+      handleStop();
+    }
+}
+
+void updateMotor()
+{
+    if ((millis() - lastInputSignal) > INPUT_TIMEOUT)
+    {
+        Serial.println("Input Timeout");
+        newSetpoint = 0;
+        motor.setSpeed(0);
+        return;
+    }
+
+    if ((millis() - lastMotorSpeedUpdate) > 100)
+    {
+        controlLoop.setInput(speedometer.getSpeed());
+        controlLoop.setTarget(newSetpoint);
+        motor.setSpeed(controlLoop.calculateOutput());
+
+        String statusJson = controlLoop.getStatusJson();
+        webSocket.sendTXT(clientNum, statusJson);
+
+        lastMotorSpeedUpdate = millis();
+    }
 }
