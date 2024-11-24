@@ -100,6 +100,12 @@ class ControlLoop {
         if(output < -100){
             output = -100;
         }
+
+        if(setPoint == 0){ //To ignore speed sensor noise
+            if(input <= 30 && input >= -30){
+                output = 0;
+            }
+        }
     }
 
     void printStatus(){
