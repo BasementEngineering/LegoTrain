@@ -14,6 +14,8 @@
 
 #include <Pinout.h>
 
+#include <HTTPClient.h>
+
 int newSetpoint = 0;
 
 TrainMotor motor(MOTOR_PIN);
@@ -26,6 +28,23 @@ unsigned long lastMotorSpeedUpdate = 0;
 
 unsigned long lastInputSignal = 0;
 #define INPUT_TIMEOUT 1000
+
+void startPump(){
+    Serial.println("Starting pump");
+    HTTPClient http;
+
+    Serial.print("[HTTP] begin...\n");
+    // configure traged server and url
+    //http.begin("https://www.howsmyssl.com/a/check", ca); //HTTPS
+    http.begin("192.168.178.78/fill");  //HTTP
+    http.addHeader("Content-Type", "application/json");
+    int httpResponseCode = http.POST("{\"filling\":true}");
+     
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+        
+    http.end();
+}
 
 WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
@@ -64,7 +83,7 @@ void handleStop()
     server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
 }
 
-Autopilot autopilot(&newSetpoint,&magnetSensors,handleStop);
+Autopilot autopilot(&newSetpoint,&magnetSensors,handleStop,startPump);
 
 void parsePayload(uint8_t *payload, size_t length)
 {
@@ -172,19 +191,27 @@ void loop()
     speedMonitor.update();
     magnetSensors.update();
 
-    if(magnetSensors.sideWasTriggered()){
-      handleStop();
+    if(controlLoop.getMode() == 3){
+        autopilot.runStateMachine();
+    }
+    else{
+      if(magnetSensors.sideWasTriggered()){
+        handleStop();
+      }
     }
 }
 
 void updateMotor()
 {
+  
+  if(controlLoop.getMode() != 3){
     if ((millis() - lastInputSignal) > INPUT_TIMEOUT)
-    {
-        Serial.println("Input Timeout");
-        newSetpoint = 0;
-        motor.setSpeed(0);
-        return;
+        {
+            Serial.println("Input Timeout");
+            newSetpoint = 0;
+            motor.setSpeed(0);
+            return;
+        }
     }
 
     if ((millis() - lastMotorSpeedUpdate) > 100)

@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+#define EVENT_TIMEOUT 3000
+
 class MagnetSensors
 {
     private:
@@ -14,6 +16,8 @@ class MagnetSensors
 
     bool bottomTriggered = false;
     bool sideTriggered = false;
+    unsigned long lastBottomTrigger = 0;
+    unsigned long lastSideTrigger = 0;
 
     public:
     MagnetSensors(int bottomPin, int sidePin){
@@ -35,10 +39,12 @@ class MagnetSensors
 
             if(lastBottomState && !bottomState){
                 bottomTriggered = true;
+                lastBottomTrigger = millis();
                 Serial.println("Bottom Triggered");
             }
             if(lastSideState && !sideState){
                 sideTriggered = true;
+                lastSideTrigger = millis();
                 Serial.println("Side Triggered");
             }
 
@@ -50,7 +56,9 @@ class MagnetSensors
         bool bottomWasTriggered(){
         if(bottomTriggered){
             bottomTriggered = false;
-            return true;
+            if((millis() - lastBottomTrigger) < EVENT_TIMEOUT){
+                return true;
+            }
         }
         return false;
     }
@@ -58,7 +66,9 @@ class MagnetSensors
     bool sideWasTriggered(){
         if(sideTriggered){
             sideTriggered = false;
-            return true;
+            if((millis() - lastSideTrigger) < EVENT_TIMEOUT){
+                return true;
+            }
         }
         return false;
     }
