@@ -36,9 +36,9 @@ void startPump(){
     Serial.print("[HTTP] begin...\n");
     // configure traged server and url
     //http.begin("https://www.howsmyssl.com/a/check", ca); //HTTPS
-    http.begin("192.168.178.78/fill");  //HTTP
-    http.addHeader("Content-Type", "application/json");
-    int httpResponseCode = http.POST("{\"filling\":true}");
+    http.begin("http://192.168.178.95/fill");  //HTTP
+    http.addHeader("Content-Type", "text/plain");
+    int httpResponseCode = http.POST("");
      
     Serial.print("HTTP Response code: ");
     Serial.println(httpResponseCode);
