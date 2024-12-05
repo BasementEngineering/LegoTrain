@@ -1,7 +1,9 @@
 #ifndef PINOUT
 #define PINOUT
 
-#define SPEED_POTI_PIN 34
+//#define SPEED_POTI_PIN 34
+#define LED_PIN 33
+#define BUTTON_PIN 25
 
 
 #define ANALOG_SENSOR_PIN 32
