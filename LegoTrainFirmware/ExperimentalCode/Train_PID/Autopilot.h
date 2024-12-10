@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "MagnetSensors.h"
+#include "ActionButton.h"
 
 #define SLOW_APPROACH_SPEED 50
 #define FW_TRAVEL_SPEED 200
@@ -12,6 +13,7 @@ enum AutopilotState
 {
     UNKNOWN,
     CALIBRATING,
+    ZERO_REACHED,
     WAITING_AT_PICKUP,
     FILLING_UP,
     MOVING_TO_NEXT_SHOT,
@@ -29,6 +31,7 @@ private:
     unsigned long lastStateChange = 0;
     int* setpoint = nullptr;
     MagnetSensors* magnetSensors = nullptr;
+    ActionButton* actionButton = nullptr;
     void (*stopCallback)();
     void (*fillCallback)();
     bool fillTriggered = false;
@@ -36,7 +39,8 @@ private:
     int bottomMagnetCount = 0;
 
 public:
-    Autopilot(int* setpoint, MagnetSensors* magnetSensors, void (*stopCallback)(), void (*fillCallback)()){
+    Autopilot(int* setpoint, ActionButton* actionButton, MagnetSensors* magnetSensors, void (*stopCallback)(), void (*fillCallback)()){
+        this->actionButton = actionButton;
         this->stopCallback = stopCallback;
         this->setpoint = setpoint;
         this->magnetSensors = magnetSensors;
@@ -57,12 +61,22 @@ public:
         fillTriggered = true;
     }
 
+    void reset(){
+        currentState = UNKNOWN;
+    }
+
     void runStateMachine(){
+        if(actionButton->stopTriggered()){
+            stopCallback();
+            switchState(UNKNOWN);
+        }
+
         switch (currentState)
         {
         case UNKNOWN:
             *setpoint = -SLOW_APPROACH_SPEED;
             Serial.println("Calibrating");
+            actionButton->setStop();
             switchState(CALIBRATING);
             break;
         case CALIBRATING:	
@@ -74,14 +88,26 @@ public:
                 stopCallback();
                 Serial.println("Calibration done");
                 Serial.println("Waiting at pickup");
-                switchState(WAITING_AT_PICKUP);
+                actionButton->setStart();
+                switchState(ZERO_REACHED);
             }
             break;
-        case WAITING_AT_PICKUP:
-            if(true){//fillTriggered){
-                Serial.println("Moving to next shot");
+        case ZERO_REACHED:
+            if(actionButton->startTriggered()){
                 *setpoint = SLOW_APPROACH_SPEED;
+                Serial.println("Waiting at pickup");
+                shotCount = 0;
+                actionButton->setStop();
                 switchState(MOVING_TO_NEXT_SHOT);
+            }
+            break;
+        case MOVING_TO_NEXT_SHOT:
+            if(magnetSensors->bottomWasTriggered()){
+                stopCallback();
+                fillCallback();
+                Serial.println("Filling up");
+                actionButton->setLoading();
+                switchState(FILLING_UP);
             }
             break;
         case FILLING_UP:
@@ -90,21 +116,23 @@ public:
                 shotCount++;
                 if(shotCount > 2){
                     *setpoint = FW_TRAVEL_SPEED;
-                    Serial.println("On route");
-                    switchState(ON_ROUTE);
+                    Serial.println("Waiting at pickup");
+                    actionButton->setStart();
+                    switchState(WAITING_AT_PICKUP);
                 }
                 else{
                     Serial.println("Moving to next shot");
+                    actionButton->setStop();
                     switchState(MOVING_TO_NEXT_SHOT);  
                 }
             }
             break;
-        case MOVING_TO_NEXT_SHOT:
-            if(magnetSensors->bottomWasTriggered()){
-                stopCallback();
-                fillCallback();
-                Serial.println("Filling up");
-                switchState(FILLING_UP);
+        case WAITING_AT_PICKUP:
+            if(actionButton->startTriggered()){//fillTriggered){
+                Serial.println("Goin en route");
+                *setpoint = FW_TRAVEL_SPEED;
+                actionButton->setStop();
+                switchState(ON_ROUTE);
             }
             break;
         case ON_ROUTE:
@@ -118,14 +146,16 @@ public:
             if(magnetSensors->sideWasTriggered()){
                 stopCallback();
                 Serial.println("Waiting at destination");
+                actionButton->setStart();
                 switchState(WAITING_AT_DESTINATION);
             }
             break;
         case WAITING_AT_DESTINATION:
-            if(millis() - lastStateChange > 5000){
+            if(actionButton->startTriggered()){
                 shotCount = 0;
                 *setpoint = -RW_TRAVEL_SPEED;
                 Serial.println("Returning to pickup");
+                actionButton->setStop();
                 switchState(RETURNING_TO_PICKUP);
             }
             break;
@@ -151,7 +181,8 @@ public:
                 stopCallback();
                 bottomMagnetCount = 0;
                 Serial.println("Waiting at pickup");
-                switchState(WAITING_AT_PICKUP);
+                actionButton->setStart();
+                switchState(ZERO_REACHED);
             }
             break;
         default:

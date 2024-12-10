@@ -6,6 +6,7 @@
 #include "Speedometer.h"
 #include "MagnetSensors.h"
 #include "Autopilot.h"
+#include "ActionButton.h"
 
 #include <WiFi.h>
 #include <WebServer.h>
@@ -23,6 +24,7 @@ ControlLoop controlLoop;
 SpeedMonitor speedMonitor;
 Speedometer speedometer(ANALOG_SENSOR_PIN);
 MagnetSensors magnetSensors(MAGNET_BOTTOM_PIN, MAGNET_SIDE_PIN);
+ActionButton actionButton(BUTTON_PIN, LED_PIN);
 
 unsigned long lastMotorSpeedUpdate = 0;
 
@@ -83,7 +85,7 @@ void handleStop()
     server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
 }
 
-Autopilot autopilot(&newSetpoint,&magnetSensors,handleStop,startPump);
+Autopilot autopilot(&newSetpoint,&actionButton,&magnetSensors,handleStop,startPump);
 
 void parsePayload(uint8_t *payload, size_t length)
 {
@@ -159,6 +161,7 @@ void setup()
 {
     Serial.begin(9600);
     Serial.println("Starting setup");
+    actionButton.begin();
     delay(500);
     Serial.println("Setting up speed monitor");
     speedMonitor.begin();
@@ -190,6 +193,7 @@ void loop()
     speedMonitor.setDistance(speedometer.getDistance());
     speedMonitor.update();
     magnetSensors.update();
+    actionButton.update();
 
     if(controlLoop.getMode() == 3){
         autopilot.runStateMachine();
