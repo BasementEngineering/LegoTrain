@@ -133,7 +133,7 @@ void updateMotor(){
   if( (millis() - lastInputSignal) > INPUT_TIMEOUT){
     Serial.println("Input Timeout");
     speed = 0;
-    currentSpeed = 0;
+    //currentSpeed = 0;
     motor.setSpeed(0);
     return;
   }
