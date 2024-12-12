@@ -162,6 +162,7 @@ void setup()
     Serial.begin(9600);
     Serial.println("Starting setup");
     actionButton.begin();
+    actionButton.setStop();
     delay(500);
     Serial.println("Setting up speed monitor");
     speedMonitor.begin();

@@ -21,7 +21,8 @@ enum AutopilotState
     ALMOST_THERE,
     WAITING_AT_DESTINATION,
     RETURNING_TO_PICKUP,
-    ALMOST_AT_PICKUP
+    ALMOST_AT_PICKUP,
+    EMERGENCY_STOPPED
 };
 
 class Autopilot
@@ -68,11 +69,20 @@ public:
     void runStateMachine(){
         if(actionButton->stopTriggered()){
             stopCallback();
-            switchState(UNKNOWN);
+            actionButton->setStart();
+            switchState(EMERGENCY_STOPPED);
         }
 
         switch (currentState)
         {
+        case EMERGENCY_STOPPED:
+            if(actionButton->startTriggered()){
+                *setpoint = -SLOW_APPROACH_SPEED;
+                Serial.println("Calibrating");
+                actionButton->setStop();
+                switchState(CALIBRATING);
+            }
+            break;
         case UNKNOWN:
             *setpoint = -SLOW_APPROACH_SPEED;
             Serial.println("Calibrating");
@@ -112,15 +122,14 @@ public:
             break;
         case FILLING_UP:
             if(millis() - lastStateChange > 10000){
-                *setpoint = SLOW_APPROACH_SPEED;
                 shotCount++;
                 if(shotCount > 2){
-                    *setpoint = FW_TRAVEL_SPEED;
                     Serial.println("Waiting at pickup");
                     actionButton->setStart();
                     switchState(WAITING_AT_PICKUP);
                 }
                 else{
+                    *setpoint = SLOW_APPROACH_SPEED;
                     Serial.println("Moving to next shot");
                     actionButton->setStop();
                     switchState(MOVING_TO_NEXT_SHOT);  
