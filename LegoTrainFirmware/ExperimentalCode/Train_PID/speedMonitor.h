@@ -27,17 +27,49 @@ class SpeedMonitor{
     //Serial.println(this->distance);
   }
 
+  void setAutopilotState(String state){
+    this->autopilotState = state;
+  }
+
   void update(){
     //Serial.println("Updating speed monitor");
     if((millis() - this->lastUpdate) > 1000){
-      //Serial.println("About to draw");
-      draw();
-      //Serial.println("Drew");
+      updateCounter++;
+
+      if(updateCounter == 5){
+        updateCounter = 0;
+        currentScreen = (currentScreen == SPEED) ? AUTOPILOT : SPEED;
+      }
+
+      switch (currentScreen)
+      {
+      case SPEED: 
+        drawSpeedScreen();
+        break;
+      case AUTOPILOT:
+        drawAutopilotScreen();
+        break;
+      
+      default:
+        break;
+      }
+
       this->lastUpdate = millis();
     }
   }
 
-  void draw(){
+  void drawAutopilotScreen(){
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.println("Autopilot: ");
+    display.setTextSize(1);
+    display.print(this->autopilotState);
+    display.display();
+  }
+
+  void drawSpeedScreen(){
     //Serial.println("Clearing display");
     display.clearDisplay();
     display.setTextSize(1);
@@ -67,13 +99,24 @@ class SpeedMonitor{
     delay(500);
     display.clearDisplay();
     display.setRotation(2);
-    draw();
+    drawSpeedScreen();
   }
+
+  enum screens{
+    SPEED,
+    AUTOPILOT
+  };
 
   private:
     float speed;
     float distance;
+    String autopilotState;
+
     unsigned long lastUpdate;
+    int updateCounter = 0;
+
+    int currentScreen = SPEED;
+
     Adafruit_SSD1306 display;
 };
 

@@ -26,6 +26,14 @@ Speedometer speedometer(ANALOG_SENSOR_PIN);
 MagnetSensors magnetSensors(MAGNET_BOTTOM_PIN, MAGNET_SIDE_PIN);
 ActionButton actionButton(BUTTON_PIN, LED_PIN);
 
+enum controlModes
+{
+    MANUAL = 0,
+    TARGET_OUTPUT = 1,
+    TARGET_SPEED = 2,
+    AUTONOMOUS = 3
+};
+
 unsigned long lastMotorSpeedUpdate = 0;
 
 unsigned long lastInputSignal = 0;
@@ -51,6 +59,16 @@ void startPump(){
 WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
+void handleStop()
+{
+    controlLoop.reset();
+    newSetpoint = 0;
+    motor.setSpeed(0);
+    server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
+}
+
+Autopilot autopilot(&newSetpoint,&actionButton,&magnetSensors, &controlLoop,handleStop,startPump);
+
 void handleRoot()
 {
     server.send(200, "text/html", htmlPage);
@@ -69,6 +87,9 @@ void handleMode()
             return;
         }
         controlLoop.setMode(doc["mode"]);
+        if(controlLoop.getMode() < 3){
+            autopilot.reset();
+        }
         server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
     }
     else if (server.method() == HTTP_GET)
@@ -76,16 +97,6 @@ void handleMode()
         server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
     }
 }
-
-void handleStop()
-{
-    controlLoop.reset();
-    newSetpoint = 0;
-    motor.setSpeed(0);
-    server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
-}
-
-Autopilot autopilot(&newSetpoint,&actionButton,&magnetSensors,handleStop,startPump);
 
 void parsePayload(uint8_t *payload, size_t length)
 {
@@ -190,13 +201,16 @@ void loop()
     updateMotor();
     server.handleClient();
     webSocket.loop();
+
     speedMonitor.setSpeed(speedometer.getSpeed());
     speedMonitor.setDistance(speedometer.getDistance());
+    speedMonitor.setAutopilotState(autopilot.getState());
     speedMonitor.update();
+
     magnetSensors.update();
     actionButton.update();
 
-    if(controlLoop.getMode() == 3){
+    if(controlLoop.getMode() == AUTONOMOUS){
         autopilot.runStateMachine();
     }
     else{
@@ -209,10 +223,10 @@ void loop()
 void updateMotor()
 {
   
-  if(controlLoop.getMode() != 3){
+  if(controlLoop.getMode() != AUTONOMOUS){
     if ((millis() - lastInputSignal) > INPUT_TIMEOUT)
         {
-            Serial.println("Input Timeout");
+            //Serial.println("Input Timeout");
             newSetpoint = 0;
             motor.setSpeed(0);
             return;

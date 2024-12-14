@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "MagnetSensors.h"
 #include "ActionButton.h"
+#include "ControlLoop.h"
 
 #define SLOW_APPROACH_SPEED 50
 #define FW_TRAVEL_SPEED 200
@@ -33,6 +34,7 @@ private:
     int* setpoint = nullptr;
     MagnetSensors* magnetSensors = nullptr;
     ActionButton* actionButton = nullptr;
+    ControlLoop* controlLoop = nullptr;
     void (*stopCallback)();
     void (*fillCallback)();
     bool fillTriggered = false;
@@ -40,13 +42,33 @@ private:
     int bottomMagnetCount = 0;
 
 public:
-    Autopilot(int* setpoint, ActionButton* actionButton, MagnetSensors* magnetSensors, void (*stopCallback)(), void (*fillCallback)()){
+    Autopilot(int* setpoint, ActionButton* actionButton, MagnetSensors* magnetSensors, ControlLoop* controlLoop, void (*stopCallback)(), void (*fillCallback)()){
         this->actionButton = actionButton;
         this->stopCallback = stopCallback;
         this->setpoint = setpoint;
         this->magnetSensors = magnetSensors;
         this->fillCallback = fillCallback;
+        this->controlLoop = controlLoop;
         currentState = UNKNOWN;
+    }
+
+    String getState(){
+        const String statusStrings[] = {
+        "UNKNOWN",
+        "CALIBRATING",
+        "ZERO_REACHED",
+        "WAITING_AT_PICKUP",
+        "FILLING_UP",
+        "MOVING_TO_NEXT_SHOT",
+        "ON_ROUTE",
+        "ALMOST_THERE",
+        "WAITING_AT_DESTINATION",
+        "RETURNING_TO_PICKUP",
+        "ALMOST_AT_PICKUP",
+        "EMERGENCY_STOPPED"
+        };
+
+        return statusStrings[currentState];
     }
 
     void switchState(AutopilotState newState){
@@ -121,7 +143,7 @@ public:
             }
             break;
         case FILLING_UP:
-            if(millis() - lastStateChange > 10000){
+            if(millis() - lastStateChange > 8000){
                 shotCount++;
                 if(shotCount > 2){
                     Serial.println("Waiting at pickup");
@@ -137,12 +159,12 @@ public:
             }
             break;
         case WAITING_AT_PICKUP:
-            if(actionButton->startTriggered()){//fillTriggered){
+            //if(actionButton->startTriggered()){//fillTriggered){
                 Serial.println("Goin en route");
                 *setpoint = FW_TRAVEL_SPEED;
                 actionButton->setStop();
                 switchState(ON_ROUTE);
-            }
+            //}
             break;
         case ON_ROUTE:
             if( (millis() - lastStateChange > 3000) && magnetSensors->bottomWasTriggered()){
