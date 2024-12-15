@@ -3,14 +3,28 @@
 #include "Speedometer.h"
 #include "MagnetSensors.h"
 
+#include "SpeedMonitor.h"
+
 #include <Pinout.h>
 
+// Metrics
+int roundCounter = 0;
+int incompleteRuns = 0;
+int misses = 0;
+int shotCount = 0;
+
 int newSetpoint = 0;
+
+int startDistance = 0;
+int endDistance = 0;
+int avgDistance = -1;
 
 TrainMotor motor(MOTOR_PIN);
 ControlLoop controlLoop;
 Speedometer speedometer(ANALOG_SENSOR_PIN);
 MagnetSensors magnetSensors(MAGNET_BOTTOM_PIN, MAGNET_SIDE_PIN);
+
+SpeedMonitor speedMonitor;
 
 unsigned long lastMotorSpeedUpdate = 0;
 unsigned long lastEventUpdate = 0;
@@ -52,6 +66,8 @@ void setStopIntterrupt(){
 
 bool middleCleared = false;
 
+//Have to add timeout, while driving forward. Start it after the first shot spot was reached. 
+//And if no more is reached after a couple of mm or seconds just go to target.
 void runTest(){
     switch (currentState)
     {
@@ -62,7 +78,9 @@ void runTest(){
             setStopIntterrupt();
             Serial.println("Starting at start position");
             Serial.println("Going forward");
+            shotCount = 0;
             currentState = GOING_FORWARD;
+            startDistance = speedometer.getDistance();
         }
         break;
     case STOPPED_FW:
@@ -72,6 +90,7 @@ void runTest(){
                 setStopIntterrupt();
                 Serial.println("Stopped FW Correcting");
                 Serial.println("Missed Magnet");
+                misses++;
                 Serial.println("Correcting");
                 currentState = CORRECTING;
                 lastEventUpdate = millis();
@@ -82,6 +101,7 @@ void runTest(){
             newSetpoint = TRAVEL_SPEED;
             setStopIntterrupt();
             Serial.println("Stopped On Point");
+            shotCount++;
             Serial.println("Going forward");
             currentState = GOING_FORWARD;
         }
@@ -91,6 +111,7 @@ void runTest(){
             if(!magnetSensors.bottomMagnetPresent()){
                 Serial.println("Stopped RW Correcting");
                 Serial.println("Missed Magnet");
+                misses++;
                 setStopIntterrupt();
                 newSetpoint = TRAVEL_SPEED;
                 currentState = GOING_FORWARD;
@@ -115,6 +136,39 @@ void runTest(){
             lastEventUpdate = millis();
             handleStopInterrupt();
             newSetpoint = -TRAVEL_SPEED;
+            Serial.println("End Reached");
+
+            if(shotCount < 6){
+                incompleteRuns++;
+                Serial.println("Incomplete Run");
+                shotCount = 0;
+            }
+            endDistance = speedometer.getDistance();
+            roundCounter++;
+            int distance = endDistance - startDistance;
+            if(avgDistance == -1){
+                avgDistance = distance;
+            }
+            else{
+                avgDistance = (avgDistance + distance) / 2;
+            }
+
+            speedMonitor.setTotalDistance(avgDistance);
+            speedMonitor.setDistance(distance);
+
+            Serial.println("---------------------");
+            Serial.print("Round: ");
+            Serial.println(roundCounter);
+            Serial.print("Misses: ");
+            Serial.println(misses);
+            Serial.print("Incomplete Runs: ");
+            Serial.println(incompleteRuns);
+            Serial.print("Distance: ");
+            Serial.println(distance);
+            Serial.print("Avg Distance: ");
+            Serial.println(avgDistance);
+            Serial.println("---------------------");
+
             Serial.println("Going backward");
             currentState = GOING_BACKWARD;
             middleCleared = false;
@@ -155,6 +209,10 @@ void setup()
     controlLoop.setMode(2);
 
     Serial.println("Ready to go");
+
+    speedMonitor.begin();
+    speedMonitor.setSpeed(0);
+    speedMonitor.update();
 }
 
 void loop()
@@ -162,6 +220,12 @@ void loop()
     updateMotor();
 
     magnetSensors.update();
+  
+    speedMonitor.setSpeed(speedometer.getSpeed());
+
+    int testValues[4] = {roundCounter, incompleteRuns, misses, shotCount};
+    speedMonitor.setTestValues(testValues);
+    speedMonitor.update();
 
     runTest();
 }
