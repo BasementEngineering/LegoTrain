@@ -18,12 +18,15 @@ unsigned long lastEventUpdate = 0;
 #define STOP_DURATION 3000
 
 enum modes {
+    AT_START_POSITION,
     GOING_FORWARD,
-    STOPPED,
+    STOPPED_FW,
+    STOPPED_RW,
+    CORRECTING,
     GOING_BACKWARD
 };
 
-int currentState = STOPPED;
+int currentState = AT_START_POSITION;
 #define TRAVEL_SPEED 50
 
 void handleStopInterrupt(){
@@ -32,7 +35,13 @@ void handleStopInterrupt(){
     newSetpoint = 0;
     motor.brake(); //Only works when moving forwards
     //motor.setSpeed(0);
-    currentState = STOPPED;
+    if(currentState == GOING_FORWARD){
+        currentState = STOPPED_FW;
+    }
+    else if(currentState == CORRECTING){
+        currentState = STOPPED_RW;
+    }
+
     digitalWrite(INTERRUPT_CHECK_PIN, !digitalRead(INTERRUPT_CHECK_PIN));
     lastEventUpdate = millis();
 }
@@ -46,14 +55,57 @@ bool middleCleared = false;
 void runTest(){
     switch (currentState)
     {
-    case STOPPED:
+    case AT_START_POSITION:
         if(millis() - lastEventUpdate > STOP_DURATION){
             lastEventUpdate = millis();
             newSetpoint = TRAVEL_SPEED;
             setStopIntterrupt();
+            Serial.println("Starting at start position");
             Serial.println("Going forward");
             currentState = GOING_FORWARD;
         }
+        break;
+    case STOPPED_FW:
+        if(millis() - lastEventUpdate > 1000){
+            if(!magnetSensors.bottomMagnetPresent()){
+                newSetpoint = -TRAVEL_SPEED;
+                setStopIntterrupt();
+                Serial.println("Stopped FW Correcting");
+                Serial.println("Missed Magnet");
+                Serial.println("Correcting");
+                currentState = CORRECTING;
+                lastEventUpdate = millis();
+            }
+        }
+        if(millis() - lastEventUpdate > STOP_DURATION){
+            lastEventUpdate = millis();
+            newSetpoint = TRAVEL_SPEED;
+            setStopIntterrupt();
+            Serial.println("Stopped On Point");
+            Serial.println("Going forward");
+            currentState = GOING_FORWARD;
+        }
+        break;
+    case STOPPED_RW:
+        if(millis() - lastEventUpdate > 1000){
+            if(!magnetSensors.bottomMagnetPresent()){
+                Serial.println("Stopped RW Correcting");
+                Serial.println("Missed Magnet");
+                setStopIntterrupt();
+                newSetpoint = TRAVEL_SPEED;
+                currentState = GOING_FORWARD;
+                lastEventUpdate = millis();
+            }
+        }
+        if(millis() - lastEventUpdate > STOP_DURATION){
+            lastEventUpdate = millis();
+            setStopIntterrupt();
+            Serial.println("GOING FORWARD");
+            newSetpoint = TRAVEL_SPEED;
+            currentState = GOING_FORWARD;
+        }
+        break;
+    case CORRECTING:
         break;
     case GOING_FORWARD:
       if(magnetSensors.bottomWasTriggered()){
@@ -76,7 +128,7 @@ void runTest(){
             lastEventUpdate = millis();
             handleStopInterrupt();
             Serial.println("Stopping");
-            currentState = STOPPED;
+            currentState = AT_START_POSITION;
             middleCleared = false;
         }
         break;
