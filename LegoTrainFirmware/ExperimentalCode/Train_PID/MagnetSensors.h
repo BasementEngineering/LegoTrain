@@ -63,6 +63,10 @@ class MagnetSensors
         return false;
     }
 
+    bool bottomMagnetPresent(){
+        return digitalRead(bottomPin) == LOW;
+    }
+
     bool sideWasTriggered(){
         if(sideTriggered){
             sideTriggered = false;

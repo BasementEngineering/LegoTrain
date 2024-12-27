@@ -54,20 +54,28 @@ void startPump(){
     Serial.println(httpResponseCode);
         
     http.end();
+    
 }
 
 WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
-void handleStop()
-{
+void stopCallback(){
     controlLoop.reset();
     newSetpoint = 0;
+    motor.brake(); //Only works when moving forwards
     motor.setSpeed(0);
+}
+
+void handleStop()
+{
+    stopCallback();
     server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
 }
 
-Autopilot autopilot(&newSetpoint,&actionButton,&magnetSensors, &controlLoop,handleStop,startPump);
+void setStopIntterrupt();
+
+Autopilot autopilot(&newSetpoint,&actionButton, &motor,&magnetSensors, &controlLoop,stopCallback,startPump,setStopIntterrupt);
 
 void handleRoot()
 {
@@ -168,6 +176,36 @@ void setupWebSocket()
     Serial.println("WebSocket server started");
 }
 
+bool stopInterruptTriggered = false;
+void handleStopInterrupt()
+    {
+        detachInterrupt(MAGNET_BOTTOM_PIN);
+        controlLoop.reset();
+        newSetpoint = 0;
+        motor.brake(); // Only works when moving forwards
+        // motor.setSpeed(0);
+
+        digitalWrite(INTERRUPT_CHECK_PIN, !digitalRead(INTERRUPT_CHECK_PIN));
+        stopInterruptTriggered = true;
+    }
+
+    void updateOnStop(){
+        if(stopInterruptTriggered){
+            autopilot.switchState(BRAKING);
+            stopInterruptTriggered = false;
+        }
+    }
+
+void setStopIntterrupt(bool enabled)
+{
+  if(enabled){
+    attachInterrupt(MAGNET_BOTTOM_PIN, handleStopInterrupt, FALLING);
+  }
+  else{
+    detachInterrupt(MAGNET_BOTTOM_PIN);
+  }
+}
+
 void setup()
 {
     Serial.begin(9600);
@@ -192,12 +230,14 @@ void setup()
 
     magnetSensors.setup();
     motor.begin();
+    pinMode(INTERRUPT_CHECK_PIN, OUTPUT);
+    digitalWrite(INTERRUPT_CHECK_PIN, LOW);
     Serial.println("Ready to go");
 }
 
 void loop()
 {
-    delay(10);
+    updateOnStop();
     updateMotor();
     server.handleClient();
     webSocket.loop();
@@ -215,7 +255,7 @@ void loop()
     }
     else{
       if(magnetSensors.sideWasTriggered()){
-        handleStop();
+        stopCallback();
       }
     }
 }

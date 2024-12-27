@@ -6,7 +6,7 @@
 
 #define ESC_BRAKE_ENABLED
 
-#define BRAKE_DEAD_TIME 100
+#define BRAKE_DEAD_TIME 500
 #define ESC_ZERO_COOLDOWN_TIME 100
 
 enum escStates{
@@ -54,7 +54,7 @@ class TrainMotor{
       }
       break;
     case ESC_FORWARD:
-      if(speed <= 0){
+      if(speed < 0){
         brake();
         Serial.println("Braking");
         state = ESC_BRAKING;
@@ -82,7 +82,7 @@ class TrainMotor{
     case ESC_REVERSE:
       if(speed > 0){
         Serial.println("Moving forward");
-        state = ESC_FORWARD;
+        state = ESC_IDLE;
       }
       else{
         motorDriver.writeMicroseconds(mircorsenconds);
@@ -94,11 +94,12 @@ class TrainMotor{
   }
 
   void brake(){
-    #ifdef ESC_BRAKE_ENABLED
-      Serial.println("Sending Brake Signal");
-      motorDriver.writeMicroseconds(1000);
+    if(state == ESC_FORWARD){
+      //Serial.println("Sending Brake Signal");
+      motorDriver.writeMicroseconds(1200);
       brakeStart = millis();
-    #endif
+      state = ESC_BRAKING;
+    }
   }
 
   private:

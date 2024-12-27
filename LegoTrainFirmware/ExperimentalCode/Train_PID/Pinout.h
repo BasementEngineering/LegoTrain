@@ -26,4 +26,6 @@ MySerial.begin(9600, SERIAL_8N1, SOFT_RX, SOFT_TX);
 #define MAGNET_BOTTOM_PIN 19
 #define MAGNET_SIDE_PIN 18
 
+#define INTERRUPT_CHECK_PIN 27
+
 #endif
