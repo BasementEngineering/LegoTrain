@@ -244,7 +244,7 @@ void loop()
 
     speedMonitor.setSpeed(speedometer.getSpeed());
     speedMonitor.setDistance(speedometer.getDistance());
-    speedMonitor.setAutopilotState(autopilot.getState());
+    speedMonitor.setAutopilotState(autopilot.getStateString(autopilot.getState()));
     speedMonitor.update();
 
     magnetSensors.update();
