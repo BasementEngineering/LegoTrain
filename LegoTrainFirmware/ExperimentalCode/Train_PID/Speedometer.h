@@ -22,6 +22,8 @@ static volatile int oldAngle = 0;
 static volatile int revolutionDelta = 0;
 static int analogSensePin;
 
+bool i2cInitialized = false;
+
 #define JIGGLE_OFFSET 1
 
 //Flats are not allowed in isr https://www.reddit.com/r/esp32/comments/lj2nkx/just_discovered_that_you_cant_use_floats_in_isr/?rdt=40811
@@ -88,22 +90,29 @@ class Speedometer {
     }
 
     void setupEncoder() {
-      Wire.begin(); //SDA, SCL
+      int retries = 0;
+      int maxRetries = 5;
+     /* Wire.begin(); //SDA, SCL
+      Wire.setTimeout(1000);
       Serial.println(">>>>>>>>>>>>>>>>>>>>>>>>>>> ");
-      if (ams5600.detectMagnet() == 0 ) {
-        while (1) {
-          if (ams5600.detectMagnet() == 1 ) {
+      while (retries < maxRetries) {
+        retries++;
+        Serial.print("Attempting to initialize I2C for AS5600, try ");
+        Serial.println(retries);
+        if (ams5600.detectMagnet() == 0) {
+          if (ams5600.detectMagnet() == 1) {
             Serial.print("Current Magnitude: ");
             Serial.println(ams5600.getMagnitude());
             ams5600.setOutPut(1);
+            i2cInitialized = true;
             break;
           }
           else {
             Serial.println("Can not detect magnet");
           }
-          delay(1000);
         }
-      }
+        delay(500); // Reduced delay to make it less blocking
+      }*/
       pinMode(analogSensePin, INPUT);
     }
 

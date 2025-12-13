@@ -25,6 +25,7 @@ SpeedSensor::SpeedSensor(){
   void SpeedSensor::begin(int pin){
     myPin = pin;
     pinMode(myPin,INPUT_PULLUP);
+    gpio_install_isr_service();
     attachInterrupt(myPin, interruptRoutine, FALLING);
   }
 

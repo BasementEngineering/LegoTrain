@@ -5,7 +5,8 @@
 #include "SpeedMonitor.h"
 #include "Speedometer.h"
 #include "MagnetSensors.h"
-#include "Autopilot.h"
+//#include "Autopilot.h"
+#include "TrackPilot.h"
 #include "ActionButton.h"
 
 #include <WiFi.h>
@@ -26,18 +27,44 @@ Speedometer speedometer(ANALOG_SENSOR_PIN);
 MagnetSensors magnetSensors(MAGNET_BOTTOM_PIN, MAGNET_SIDE_PIN);
 ActionButton actionButton(BUTTON_PIN, LED_PIN);
 
-enum controlModes
+enum userlModes
 {
-    MANUAL = 0,
-    TARGET_OUTPUT = 1,
-    TARGET_SPEED = 2,
-    AUTONOMOUS = 3
+    USER_MANUAL = 0,
+    USER_TARGET_OUTPUT = 1,
+    USER_TARGET_SPEED = 2,
+    USER_AUTONOMOUS = 3
 };
+
+int currentUserMode = USER_MANUAL;
 
 unsigned long lastMotorSpeedUpdate = 0;
 
 unsigned long lastInputSignal = 0;
 #define INPUT_TIMEOUT 1000
+
+void anounceArrival(){
+    Serial.println("Ding Ding! Arrived at station.");
+    HTTPClient http;
+
+    Serial.print("[HTTP] begin...\n");
+    // configure traged server and url
+    //http.begin("https://www.howsmyssl.com/a/check", ca); //HTTPS
+    http.begin("http://192.168.178.78:5000/trainArriving");  //HTTP
+    http.addHeader("Content-Type", "text/plain");
+    http.setTimeout(200);
+    int httpResponseCode = http.POST("");
+     
+    if (httpResponseCode > 0) {
+        String payload = http.getString();
+        Serial.println(payload);
+    }
+    
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+        
+    http.end();
+}
+
 
 void startPump(){
     Serial.println("Starting pump");
@@ -70,12 +97,13 @@ void stopCallback(){
 void handleStop()
 {
     stopCallback();
-    server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
+    server.send(200, "application/json", "{\"mode\":" + String(currentUserMode) + "}");
 }
 
 void setStopIntterrupt();
 
-Autopilot autopilot(&newSetpoint,&actionButton, &motor,&magnetSensors, &controlLoop,stopCallback,startPump,setStopIntterrupt);
+//Autopilot autopilot(&newSetpoint,&actionButton, &motor,&magnetSensors, &controlLoop,stopCallback,startPump,setStopIntterrupt);
+Trackpilot autopilot(&newSetpoint, &actionButton, &motor, &magnetSensors, &controlLoop, stopCallback, startPump, anounceArrival, setStopIntterrupt);
 
 void handleRoot()
 {
@@ -94,15 +122,20 @@ void handleMode()
             Serial.println(error.c_str());
             return;
         }
-        controlLoop.setMode(doc["mode"]);
-        if(controlLoop.getMode() < 3){
+        int mode = doc["mode"];
+        currentUserMode = mode;
+        if(mode == USER_AUTONOMOUS){
+            autopilot.enter();
+        }
+        else if(mode < 3){
+            controlLoop.setMode(mode);
             autopilot.reset();
         }
-        server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
+        server.send(200, "application/json", "{\"mode\":" + String(currentUserMode) + "}");
     }
     else if (server.method() == HTTP_GET)
     {
-        server.send(200, "application/json", "{\"mode\":" + String(controlLoop.getMode()) + "}");
+        server.send(200, "application/json", "{\"mode\":" + String(currentUserMode) + "}");
     }
 }
 
@@ -118,7 +151,7 @@ void parsePayload(uint8_t *payload, size_t length)
     }
     if (doc.containsKey("setpoint"))
     {
-        if(controlLoop.getMode() < 3){
+        if(currentUserMode < 3){
             newSetpoint = doc["setpoint"];
             lastInputSignal = millis();
         }
@@ -191,7 +224,7 @@ void handleStopInterrupt()
 
     void updateOnStop(){
         if(stopInterruptTriggered){
-            autopilot.switchState(BRAKING);
+            autopilot.switchState(STOPPING);
             stopInterruptTriggered = false;
         }
     }
@@ -250,7 +283,7 @@ void loop()
     magnetSensors.update();
     actionButton.update();
 
-    if(controlLoop.getMode() == AUTONOMOUS){
+    if(currentUserMode == USER_AUTONOMOUS){
         autopilot.runStateMachine();
     }
     else{
@@ -263,7 +296,7 @@ void loop()
 void updateMotor()
 {
   
-  if(controlLoop.getMode() != AUTONOMOUS){
+  if(currentUserMode != USER_AUTONOMOUS){
     if ((millis() - lastInputSignal) > INPUT_TIMEOUT)
         {
             //Serial.println("Input Timeout");
