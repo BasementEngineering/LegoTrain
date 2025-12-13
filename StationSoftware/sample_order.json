@@ -1,0 +1,9 @@
+{
+  "name1": "Oliver",
+  "color1": "grün",
+  "name2": "Emma", 
+  "color2": "blau",
+  "name3": "Max",
+  "color3": "rot",
+  "use_tts": true
+}
