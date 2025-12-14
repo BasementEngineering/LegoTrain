@@ -71,23 +71,34 @@ def order_ready():
                 "message": "No JSON data provided"
             }), 400
         
-        nr_of_pairs = 0
-        pairs = []
-        for i in range(1, 10):
-            name_key = f"name{i}"
-            color_key = f"color{i}"
-            if name_key in data and color_key in data:
-                name = data[name_key]
-                color = data[color_key]
-                pairs.append((name, color))
-                nr_of_pairs += 1
-            else:
-                break
+        # Handle array of orders
+        if not isinstance(data, list):
+            return jsonify({
+                "status": "error",
+                "message": "Data should be an array of orders"
+            }), 400
+        
+        orders = data
+        nr_of_orders = len(orders)
+        
+        # Validate orders format
+        for order in orders:
+            if not all(key in order for key in ["name", "drink", "color"]):
+                return jsonify({
+                    "status": "error",
+                    "message": "Each order must have 'name', 'drink', and 'color' fields"
+                }), 400
 
-        order_intro = f"In diesem Zug finden Sie {nr_of_pairs} shotgläser."
+        order_intro = f"In diesem Zug finden Sie {nr_of_orders} Getränke."
         order_message = ""
-        for pair in pairs:
-            order_message += f"Eins für {pair[0]} in {pair[1]}, "
+        
+        # List of adjectives for drinks
+        drink_adjectives = ["leckeren", "bekömmlichen", "wohlschmeckenden", "großartigen", "erfrischenden", "köstlichen"]
+        
+        for order in orders:
+            adjective = random.choice(drink_adjectives)
+            order_message += f"Für {order['name']} in {order['color']} einen {adjective} {order['drink']}, "
+        
         order_message = order_message.strip().rstrip(',')
 
         tts_manager.speak(order_intro)
@@ -95,8 +106,7 @@ def order_ready():
             
         return jsonify({
                 "status": "success",
-                "message": f"Playing delivery announcement for {len(pairs)} pairs",
-                "pairs": pairs,
+                "message": f"Playing delivery announcement for pairs",
                 "method": "audio files"
             })
             
@@ -104,31 +114,6 @@ def order_ready():
         return jsonify({
             "status": "error",
             "message": f"Error processing order ready request: {str(e)}"
-        }), 500
-
-@app.route('/orderReadyTTS', methods=['POST'])
-def order_ready_tts():
-    """Alternative endpoint that always uses text-to-speech"""
-    try:
-        # Parse JSON request
-        data = request.get_json()
-        
-        if not data:
-            return jsonify({
-                "status": "error",
-                "message": "No JSON data provided"
-            }), 400
-        
-        # Force TTS mode
-        data['use_tts'] = True
-        
-        # Reuse the main order_ready logic
-        return order_ready()
-            
-    except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": f"Error processing TTS order ready request: {str(e)}"
         }), 500
 
 @app.route('/test', methods=['GET'])
@@ -140,7 +125,6 @@ def test_endpoint():
         "endpoints": [
             "/trainArriving - Play random train arriving sound",
             "/orderReady - Play delivery announcement with audio files or TTS",
-            "/orderReadyTTS - Play delivery announcement with TTS only",
             "/test - This test endpoint"
         ]
     })
