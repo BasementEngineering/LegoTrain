@@ -7,7 +7,8 @@ enum controlModes
     MANUAL = 0,
     TARGET_OUTPUT = 1,
     TARGET_SPEED = 2,
-    FAST_TARGET_OUTPUT = 3
+    FAST_TARGET_OUTPUT = 3,
+    DOWNHILL_MODE = 4
 };
 
 class ControlLoop
@@ -26,11 +27,16 @@ public:
         Serial.println("Controller created");
     }
 
+    void stop()
+    {
+        output = 0;
+    }
+
     void reset()
     {
         setPoint = 0;
         input = 0;
-        output = 0;
+        //output = 0;
         startingFromStop = true;
     }
 
@@ -40,6 +46,10 @@ public:
         Serial.println(mode);
         this->mode = mode;
         reset();
+        if(mode == DOWNHILL_MODE){
+            Serial.println("Downhill Mode activated");
+            output = 20; // Initial power for downhill
+        }
     }
 
     int getMode()
@@ -90,7 +100,11 @@ public:
         case FAST_TARGET_OUTPUT:
             calculateFastTargetOutputMode();
             break;
+        case DOWNHILL_MODE:
+            calculateDownhillMode();
+            break;
         }
+        
         return output;
     }
 
@@ -173,100 +187,19 @@ public:
         }
     }
 
-    /*int previousInputs[10] = {0};
-    int inputIndex = 0;
-
-    void updateInputHistory(int newInput) {
-        previousInputs[inputIndex] = newInput;
-        inputIndex = (inputIndex + 1) % 10;
-    }*/
-
-    // If we are going downhill, the input speed will suddenly start to increase
-    // while the output is still pushing forward (>0).
-    // If we are going uphill in reverse, the input speed will suddenly start to decrease (more negative)
-    // while the output is still pushing backward (<0).
-    // This function detects both scenarios and reduces output to compensate
-    /*bool detectUnwantedInputIncrease()
+    void calculateDownhillMode()
     {
-        if (output == 0)
+        int minSpeed = -50; // Minimum speed to maintain downhill movement
+        int maxSpeed = -100; // Maximum speed to avoid overspeeding
+        if(input <= maxSpeed)
         {
-            return false; // No correction needed when output is zero
+            output += 2; // Stop if we've reached or gone below the target speed
         }
-
-        int unwantedChanges = 0;
-
-        for (int i = 0; i < 9; i++)
+        else if(input >= minSpeed)
         {
-            if (output > 0)
-            {
-                // When going forward, detect unwanted speed increases
-                if (previousInputs[i + 1] > previousInputs[i])
-                {
-                    unwantedChanges++;
-                }
-            }
-            else
-            {
-                // When going backward, detect unwanted speed decreases (more negative = faster backward)
-                if (previousInputs[i + 1] < previousInputs[i])
-                {
-                    unwantedChanges++;
-                }
-            }
+            output -= 1; // Speed up if we're below the minimum speed
         }
-
-        if (unwantedChanges >= 7)
-        { // If 7 out of last 9 readings show unwanted change
-            // Take corrective action
-            return true;
-        }
-        return false;
-    }
-*/
-    void fasterController()
-    {
-        // max speed is -200mm/s to 200mm/s
-        //  therefore error range is -400 to 400
-        int error = setPoint - input;
-        int normalizedError = map(error, -400, 400, -100, 100);
-        int adjustment = normalizedError * 0.05; // Scale down adjustment
-
-        // To be implemented
-        if (input < setPoint)
-        {
-            output += 1;
-            output += adjustment;
-        }
-        else if (input > setPoint)
-        {
-            output -= 1;
-            output += adjustment;
-        }
-        if (output > 100)
-        {
-            output = 100;
-        }
-        if (output < -100)
-        {
-            output = -100;
-        }
-    }
-
-    void hillCompensation()
-    {
-        int delta = setPoint - input;
-
-        // Moving Forward downhill
-        if (input > 0 && output > 0 && delta < -50)
-        {
-            Serial.println("Unwanted forward speed increase detected, reducing output");
-            output -= 5; // Reduce forward output to compensate for downhill
-        }
-        else if (input < 0 && output < 0 && delta > 50)
-        {
-            Serial.println("Unwanted backward speed increase detected, reducing output magnitude");
-            output += 5; // Reduce backward output magnitude to compensate for uphill in reverse
-        }
+        capOutput();
     }
 
     void capOutput()
