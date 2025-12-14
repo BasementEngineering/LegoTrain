@@ -197,3 +197,11 @@ The server includes comprehensive error handling for:
 - File system errors
 
 All endpoints return JSON responses with status and error information.
+
+## Deployment
+The application can be deployed on any server that supports Python and Flask. Consider using a production-ready server like Gunicorn or uWSGI for better performance and reliability.
+
+Device: Raspberry Pi Zero 2 W
+OS: Raspberry Pi OS (32-bit) with Desktop
+
+Connect to Desktop via VNC.

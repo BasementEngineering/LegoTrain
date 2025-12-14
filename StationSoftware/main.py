@@ -32,11 +32,11 @@ def train_arriving():
     
     trainArrivingMessages = [
     "Ihr Zug fährt ein, bitte nicht mehr auf den Gleisen schlafen",
-    "Achtung, der Zug kommt",
+    "Wir entschuldigen uns dafür, dass der Zug heute keine Verspätung hat",
     "Achtung, dieser Zug hat keine Bremsen",
     "Auf Gleis 1 fährt in Kürze der RE69 ein",
     "Zurücktreten bitte, Alkohol ist im Anmarsch",
-    "Achtung, die Party ein",
+    "Achtung an Gleis 1, die Party fährt ein.",
     "Heute statt Personen, Alkohol im Gleis"
     ]
     try:
