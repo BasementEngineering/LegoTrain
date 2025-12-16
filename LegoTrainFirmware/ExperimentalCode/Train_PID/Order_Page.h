@@ -1,3 +1,7 @@
+#ifndef ORDER_PAGE_H
+#define ORDER_PAGE_H
+
+const char orderPage[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -9,19 +13,11 @@
             font-family: Arial, sans-serif;
             padding: 20px;
             background-color: #f0f0f0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
         }
         .container {
             display: flex;
             gap: 20px;
             flex-wrap: wrap;
-            justify-content: center;
-            max-width: 1200px;
-            width: 100%;
         }
         .tile {
             padding: 20px;
@@ -31,15 +27,15 @@
         }
         .tile-red {
             background-color: #ffebeb;
-            border: 3px solid #d62e2e;
+            border: 3px solid #ff4444;
         }
         .tile-green {
             background-color: #ebffeb;
-            border: 3px solid #09a709;
+            border: 3px solid #44ff44;
         }
         .tile-blue {
             background-color: #ebebff;
-            border: 3px solid #1e8fab;
+            border: 3px solid #4444ff;
         }
         .field-group {
             margin-bottom: 15px;
@@ -63,10 +59,6 @@
         h2 {
             margin-top: 0;
             text-align: center;
-        }
-        h1 {
-            text-align: center;
-            margin-bottom: 30px;
         }
         .deliver-btn {
             background-color: #4CAF50;
@@ -188,3 +180,6 @@
     </script>
 </body>
 </html>
+)rawliteral";
+
+#endif

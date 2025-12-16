@@ -80,6 +80,7 @@ private:
     void (*fillCallback)();
     void (*setStopIntterrupt)(bool);
     void (*anounceArrival)();
+    void (*announceOrder)();
 
     int bottomMagnetCount = 0;
     bool middleCleared = false;
@@ -87,7 +88,7 @@ private:
     unsigned long randomWaitInterval = 3600000;
 
 public:
-    Trackpilot(int *setpoint, ActionButton *actionButton, TrainMotor *trainMotor, MagnetSensors *magnetSensors, ControlLoop *controlLoop, void (*stopCallback)(), void (*fillCallback)(),void (*announceCallback)(), void (*setStopIntterrupt)(bool))
+    Trackpilot(int *setpoint, ActionButton *actionButton, TrainMotor *trainMotor, MagnetSensors *magnetSensors, ControlLoop *controlLoop, void (*stopCallback)(), void (*fillCallback)(),void (*announceCallback)(), void (*announceOrder)(), void (*setStopIntterrupt)(bool))
     {
         this->actionButton = actionButton;
         this->stopCallback = stopCallback;
@@ -95,6 +96,7 @@ public:
         this->magnetSensors = magnetSensors;
         this->fillCallback = fillCallback;
         this->anounceArrival = announceCallback;
+        this->announceOrder = announceOrder;
         this->controlLoop = controlLoop;
         this->motor = trainMotor;
         this->setStopIntterrupt = setStopIntterrupt;
@@ -268,12 +270,12 @@ public:
             controlLoop->setMode(FAST_TARGET_OUTPUT); // Fast Target Output Mode
             //controlLoop->setMode(1); // Target Output Mode
             actionButton->setStop();
+            announceArrival();
             break;
         case CLIMB_ENDING:
             Serial.println("Climb Ending");
             controlLoop->setMode(FAST_TARGET_OUTPUT); // Target Output Mode
             *setpoint = UPPER_CRUISE_POWER;
-            anounceArrival();
             actionButton->setStop();
             break;
         case ARRIVING_UPPER_STATION:
@@ -281,6 +283,7 @@ public:
             *setpoint = 50;
             //controlLoop->setMode(1); // Target Output Mode
             actionButton->setStop();
+            announceOrder();
             break;
         case STOPPING:
             controlLoop->setMode(TARGET_OUTPUT); // Target Output Mode

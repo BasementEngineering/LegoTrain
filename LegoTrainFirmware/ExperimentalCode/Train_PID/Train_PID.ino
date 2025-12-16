@@ -1,6 +1,7 @@
 #include "TrainMotor.h"
 #include "Credentials.h"
 #include "Frontend.h"
+#include "Order_Page.h"
 #include "ControlLoop.h"
 #include "SpeedMonitor.h"
 #include "Speedometer.h"
@@ -42,6 +43,8 @@ unsigned long lastMotorSpeedUpdate = 0;
 unsigned long lastInputSignal = 0;
 #define INPUT_TIMEOUT 1000
 
+StaticJsonDocument<1024> orderDoc;
+
 void anounceArrival(){
     Serial.println("Ding Ding! Arrived at station.");
     HTTPClient http;
@@ -65,6 +68,28 @@ void anounceArrival(){
     http.end();
 }
 
+void announceOrder(){
+    Serial.println("Sending order to announcer");
+    HTTPClient http;
+
+    Serial.print("[HTTP] begin...\n");
+    // configure traged server and url
+    //http.begin("https://www.howsmyssl.com/a/check", ca); //HTTPS
+    http.begin("http://192.168.178.78:5000/newOrder");  //HTTP
+    http.addHeader("Content-Type", "text/json");
+    http.setTimeout(200);
+    int httpResponseCode = http.POST(orderDoc.as<String>());
+     
+    if (httpResponseCode > 0) {
+        String payload = http.getString();
+        Serial.println(payload);
+    }
+    
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+        
+    http.end();
+}
 
 void startPump(){
     Serial.println("Starting pump");
@@ -103,11 +128,32 @@ void handleStop()
 void setStopIntterrupt();
 
 //Autopilot autopilot(&newSetpoint,&actionButton, &motor,&magnetSensors, &controlLoop,stopCallback,startPump,setStopIntterrupt);
-Trackpilot autopilot(&newSetpoint, &actionButton, &motor, &magnetSensors, &controlLoop, stopCallback, startPump, anounceArrival, setStopIntterrupt);
+Trackpilot autopilot(&newSetpoint, &actionButton, &motor, &magnetSensors, &controlLoop, stopCallback, startPump, anounceArrival, announceOrder, setStopIntterrupt);
 
 void handleRoot()
 {
     server.send(200, "text/html", htmlPage);
+}
+
+void serverOrderPage()
+{
+    server.send(200, "text/html", orderPage);
+}
+
+void handleOrder()
+{
+    orderDoc.clear();
+    String requestBody = server.arg("plain");
+    DeserializationError error = deserializeJson(orderDoc, requestBody);
+    if (error) {
+        Serial.print(F("deserializeJson() failed: "));
+        Serial.println(error.c_str());
+        server.send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+        return;
+    }
+    Serial.println("Order received:");
+    serializeJsonPretty(orderDoc, Serial);
+    server.send(200, "text/html", "Order received");
 }
 
 void handleMode()
@@ -198,6 +244,12 @@ void setupWebServer()
     server.on("/", handleRoot);
     server.on("/mode", handleMode);
     server.on("/stop", handleStop);
+    server.on("/order", HTTP_GET, serverOrderPage);
+    server.on("/order", HTTP_POST, handleOrder);
+    server.on("/start", []() {
+        actionButton.setStartTrigger();
+        server.send(200, "text/plain", "Start Commanded");
+    });
     server.begin();
     Serial.println("HTTP server started");
 }

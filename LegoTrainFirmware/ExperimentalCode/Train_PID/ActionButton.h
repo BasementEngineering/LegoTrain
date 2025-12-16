@@ -102,6 +102,11 @@ public:
         eventTriggered = false;
     }
 
+    void setStartTrigger(){
+        if(nextEvent == START)
+            eventTriggered = true;
+        }
+
 private:
     uint8_t _buttonPin;
     uint8_t _numLeds;
