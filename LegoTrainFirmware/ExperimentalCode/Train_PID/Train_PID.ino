@@ -1,7 +1,6 @@
 #include "TrainMotor.h"
 #include "Credentials.h"
 #include "Frontend.h"
-#include "Order_Page.h"
 #include "ControlLoop.h"
 #include "SpeedMonitor.h"
 #include "Speedometer.h"
@@ -52,7 +51,7 @@ void anounceArrival(){
     Serial.print("[HTTP] begin...\n");
     // configure traged server and url
     //http.begin("https://www.howsmyssl.com/a/check", ca); //HTTPS
-    http.begin("http://192.168.178.78:5000/trainArriving");  //HTTP
+    http.begin("http://192.168.178.158:5000/trainArriving");  //HTTP
     http.addHeader("Content-Type", "text/plain");
     http.setTimeout(200);
     int httpResponseCode = http.POST("");
@@ -75,8 +74,8 @@ void announceOrder(){
     Serial.print("[HTTP] begin...\n");
     // configure traged server and url
     //http.begin("https://www.howsmyssl.com/a/check", ca); //HTTPS
-    http.begin("http://192.168.178.78:5000/newOrder");  //HTTP
-    http.addHeader("Content-Type", "text/json");
+    http.begin("http://192.168.178.158:5000/orderReady");  //HTTP
+    http.addHeader("Content-Type", "application/json");
     http.setTimeout(200);
     int httpResponseCode = http.POST(orderDoc.as<String>());
      
@@ -132,12 +131,22 @@ Trackpilot autopilot(&newSetpoint, &actionButton, &motor, &magnetSensors, &contr
 
 void handleRoot()
 {
-    server.send(200, "text/html", htmlPage);
+    #ifdef COMPRESSED_PAGES
+    server.sendHeader("Content-Encoding", "gzip");
+    server.send_P(200, "text/html", (const char*)indexPage_compressed, indexPage_compressed_size);
+    #else
+    server.send(200, "text/html", indexPage);
+    #endif
 }
 
 void serverOrderPage()
 {
+    #ifdef COMPRESSED_PAGES
+    server.sendHeader("Content-Encoding", "gzip");
+    server.send_P(200, "text/html", (const char*)orderPage_compressed, orderPage_compressed_size);
+    #else
     server.send(200, "text/html", orderPage);
+    #endif
 }
 
 void handleOrder()

@@ -79,7 +79,7 @@ private:
     void (*stopCallback)();
     void (*fillCallback)();
     void (*setStopIntterrupt)(bool);
-    void (*anounceArrival)();
+    void (*announceArrival)();
     void (*announceOrder)();
 
     int bottomMagnetCount = 0;
@@ -88,15 +88,15 @@ private:
     unsigned long randomWaitInterval = 3600000;
 
 public:
-    Trackpilot(int *setpoint, ActionButton *actionButton, TrainMotor *trainMotor, MagnetSensors *magnetSensors, ControlLoop *controlLoop, void (*stopCallback)(), void (*fillCallback)(),void (*announceCallback)(), void (*announceOrder)(), void (*setStopIntterrupt)(bool))
+    Trackpilot(int *setpoint, ActionButton *actionButton, TrainMotor *trainMotor, MagnetSensors *magnetSensors, ControlLoop *controlLoop, void (*stopCallback)(), void (*fillCallback)(),void (*announceCallback)(), void (*announceOrderCallback)(), void (*setStopIntterrupt)(bool))
     {
         this->actionButton = actionButton;
         this->stopCallback = stopCallback;
         this->setpoint = setpoint;
         this->magnetSensors = magnetSensors;
         this->fillCallback = fillCallback;
-        this->anounceArrival = announceCallback;
-        this->announceOrder = announceOrder;
+        this->announceArrival = announceCallback;
+        this->announceOrder = announceOrderCallback;
         this->controlLoop = controlLoop;
         this->motor = trainMotor;
         this->setStopIntterrupt = setStopIntterrupt;
